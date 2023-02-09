@@ -1,0 +1,205 @@
+---
+title: "Wordle Optimization"
+author: "Carson Buttars"
+date: "2022-10-07"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source('~/docs/woRdle/search-functions.R')
+library(knitr)
+library(ggplot2)
+library(tidyverse)
+```
+
+# Intro
+
+In this document, we will explore the question: what are the best methods for guessing a word in wordle?
+In particular, I want to know:
+  * What word is the best to start out with?
+  * What strategy of choosing a word to guess is the best (ex. lots of vowels, no vowels, common letters, etc.)
+
+For this analysis, I will be assuming I know the exact ditionary that wordle uses. 
+This is not realistic, but most likely we can say that the wordle dictionary is contained by the dictionary I will use.
+The information will still be mostly applicable, but the best results would be to follow the same analysis on the exact dictionary that wordle uses.
+
+# Best First Guess
+
+One way of approaching this first part is to choose a word that has the most common letters in it.
+To start off, here is a list of the frequency of each letter in this dictionary.
+```{r Letter-freq}
+letter.freq <- read.table("~/docs/woRdle/dict-letter-freq",sep = " ")
+colnames(letter.freq) <- c("Frequency","Letter")
+kable(letter.freq[17:26,])
+```
+
+Then we can split up the words into tiers based on how many of the most common letters they have.
+When referencing this later, I will name the tiers as such: tier 1 will contain the most common letter, tier 2 will contain the 2 most common letter and so on.
+When going past tier 5, they will only be required to contain a combination of the most common letters.
+Another characteristic of the words in these guesses is that none of them will contain duplicate letters.
+
+Having set up the word tier groups, I simulated the first guess of a wordle game and pulled out the results of how many greens and how many yellows there were for a random word in each tier.
+
+Doing this test with `r reps` repetitions of each tier gives us the following result:
+```{r guess-results, echo=F}
+guess.data <- read.csv('~/docs/woRdle/guess-table.csv',header = F)
+first.guess.results <- data.frame("Tier" = numeric(10), "Yellow Mean" = numeric(10), "Green Mean" = numeric(10), "Score" = numeric(10))
+for(i in 1:10){
+  yelm <- guess.data[guess.data$Tier == i,2] |> mean()
+  grem <- guess.data[guess.data$Tier == i,2] |> mean()
+  score <- 2 * grem + yelm
+  first.guess.results[i,] = c(i,yelm,grem,score)
+}
+kable(first.guess.results)
+```
+
+# Guessing Methods
+
+There are three basic methods of guessing:
+	* standard guess: guessing from the list of all possible words based on what the result of previous guesses are and what are the most common letters
+	* orthogonal guess: removing all the known letters of the word and guessing on words that contain the most common letters from that list
+	* blended orthogonal guess: removing green letters, but using yellow letters and most common letters to form a guess
+
+Each of these methods have advantages and disadvantages. 
+From what it seems, a standard guess is good for making a guess when most of the word is known.
+On the other end, the orthogonal guess is good for making a guess when very little information is known.
+Then, the blended orthogonal is good when there are lots of yellow letters, but not many green.
+My aim is to see when these different methods of guessing are the most useful and to what extent.
+Here are the results of a simmulation of these methods for guessing:
+
+```{r guess-methods-overall}
+standard.table <- read.csv('~/docs/woRdle/standard-guess-method.csv')
+blend.table <- read.csv('~/docs/woRdle/blend-guess-method.csv')
+orthogonal.table <- read.csv('~/docs/woRdle/orthogonal-guess-method.csv')
+
+# Methods table 1 (overall comparison)
+methods.results.table1 <- data.frame(
+				     'Method' = character(3),
+				     'Mean.ratio' = character(3),
+				     'Mean.greens' = character(3),
+				     'Mean.yellows' = character(3)
+)
+methods.results.table1$Method <- c('Standard','Blend','Orthogonal')
+st.ratio.mean <- mean(standard.table$Ratio)
+bl.ratio.mean <- mean(blend.table$Ratio)
+or.ratio.mean <- mean(orthogonal.table$Ratio)
+methods.results.table1$Mean.ratio <- c(st.ratio.mean,bl.ratio.mean,or.ratio.mean)
+st.greens.mean <- mean(standard.table$Greens)
+bl.greens.mean <- mean(blend.table$Greens)
+or.greens.mean <- mean(orthogonal.table$Greens)
+methods.results.table1$Mean.greens <- c(st.greens.mean,bl.greens.mean,or.greens.mean)
+st.yellows.mean <- mean(standard.table$Yellows)
+bl.yellows.mean <- mean(blend.table$Yellows)
+or.yellows.mean <- mean(orthogonal.table$Yellows)
+methods.results.table1$Mean.yellows <- c(st.yellows.mean,bl.greens.mean,or.yellows.mean)
+kable(methods.results.table1)
+```
+
+```{r guess-methods-ranges}
+methods.results.table2 <- data.frame(
+				     'Range' = character(12),
+				     'Standard.ratio' = numeric(12),
+				     'Blend.ratio' = numeric(12),
+				     'Orthogonal.ratio' = numeric(12)
+)
+methods.results.table2$Range <- c('0-300','300-600','600-900','900-1200','1200-1500','1500-1800','1800-2100','2100-2400','2400-2700','2700-3000','3000-3300','3300 and up')
+vector.tmp <- numeric(0)
+vector.tmp[1] <- mean(standard.table[standard.table$Pre.length < 300,3])
+vector.tmp[2] <- mean(standard.table[(300 <= standard.table$Pre.length) & (standard.table$Pre.length < 600),3])
+vector.tmp[3] <- mean(standard.table[(600 <= standard.table$Pre.length) & (standard.table$Pre.length < 900),3])
+vector.tmp[4] <- mean(standard.table[(900 <= standard.table$Pre.length) & (standard.table$Pre.length < 1200),3])
+vector.tmp[5] <- mean(standard.table[(1200 <= standard.table$Pre.length) & (standard.table$Pre.length < 1500),3])
+vector.tmp[6] <- mean(standard.table[(1500 <= standard.table$Pre.length) & (standard.table$Pre.length < 1800),3])
+vector.tmp[7] <- mean(standard.table[(1800 <= standard.table$Pre.length) & (standard.table$Pre.length < 2100),3])
+vector.tmp[8] <- mean(standard.table[(2100 <= standard.table$Pre.length) & (standard.table$Pre.length < 2400),3])
+vector.tmp[9] <- mean(standard.table[(2400 <= standard.table$Pre.length) & (standard.table$Pre.length < 2700),3])
+vector.tmp[10] <- mean(standard.table[(2700 <= standard.table$Pre.length) & (standard.table$Pre.length < 3000),3])
+vector.tmp[11] <- mean(standard.table[(3000 <= standard.table$Pre.length) & (standard.table$Pre.length < 3300),3])
+vector.tmp[12] <- mean(standard.table[(3300 <= standard.table$Pre.length) & (standard.table$Pre.length < 3800),3])
+methods.results.table2$Standard.ratio <- vector.tmp
+vector.tmp[1] <- mean(blend.table[blend.table$Pre.length < 300,3])
+vector.tmp[2] <- mean(blend.table[(300 <= blend.table$Pre.length) & (blend.table$Pre.length < 600),3])
+vector.tmp[3] <- mean(blend.table[(600 <= blend.table$Pre.length) & (blend.table$Pre.length < 900),3])
+vector.tmp[4] <- mean(blend.table[(900 <= blend.table$Pre.length) & (blend.table$Pre.length < 1200),3])
+vector.tmp[5] <- mean(blend.table[(1200 <= blend.table$Pre.length) & (blend.table$Pre.length < 1500),3])
+vector.tmp[6] <- mean(blend.table[(1500 <= blend.table$Pre.length) & (blend.table$Pre.length < 1800),3])
+vector.tmp[7] <- mean(blend.table[(1800 <= blend.table$Pre.length) & (blend.table$Pre.length < 2100),3])
+vector.tmp[8] <- mean(blend.table[(2100 <= blend.table$Pre.length) & (blend.table$Pre.length < 2400),3])
+vector.tmp[9] <- mean(blend.table[(2400 <= blend.table$Pre.length) & (blend.table$Pre.length < 2700),3])
+vector.tmp[10] <- mean(blend.table[(2700 <= blend.table$Pre.length) & (blend.table$Pre.length < 3000),3])
+vector.tmp[11] <- mean(blend.table[(3000 <= blend.table$Pre.length) & (blend.table$Pre.length < 3300),3])
+vector.tmp[12] <- mean(blend.table[(3300 <= blend.table$Pre.length) & (blend.table$Pre.length < 3800),3])
+methods.results.table2$Blend.ratio <- vector.tmp
+vector.tmp[1] <- mean(orthogonal.table[orthogonal.table$Pre.length < 300,3])
+vector.tmp[2] <- mean(orthogonal.table[(300 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 600),3])
+vector.tmp[3] <- mean(orthogonal.table[(600 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 900),3])
+vector.tmp[4] <- mean(orthogonal.table[(900 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 1200),3])
+vector.tmp[5] <- mean(orthogonal.table[(1200 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 1500),3])
+vector.tmp[6] <- mean(orthogonal.table[(1500 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 1800),3])
+vector.tmp[7] <- mean(orthogonal.table[(1800 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 2100),3])
+vector.tmp[8] <- mean(orthogonal.table[(2100 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 2400),3])
+vector.tmp[9] <- mean(orthogonal.table[(2400 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 2700),3])
+vector.tmp[10] <- mean(orthogonal.table[(2700 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 3000),3])
+vector.tmp[11] <- mean(orthogonal.table[(3000 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 3300),3])
+vector.tmp[12] <- mean(orthogonal.table[(3300 <= orthogonal.table$Pre.length) & (orthogonal.table$Pre.length < 3800),3])
+methods.results.table2$Orthogonal.ratio <- vector.tmp
+rm(vector.tmp)
+kable(methods.results.table2)
+ggplot()+
+	geom_point(data = standard.table,aes(x = Pre.length, y = Ratio),color = 'red')+
+	geom_point(data = blend.table,aes(x = Pre.length, y = Ratio),color = 'green')+
+	geom_point(data = orthogonal.table,aes(x = Pre.length, y = Ratio),color = 'blue')
+```
+
+```{r guess-methods-greens-yellows}
+# Greens
+pre.post.table <- read.csv('~/docs/woRdle/pre-post-simulation-greens.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
+
+pre.post.table <- pre.post.table[pre.post.table$Pre.number.greens != 5,]
+pre.post.standard = pre.post.table[pre.post.table$Method == 'Standard',]
+pre.post.blend = pre.post.table[pre.post.table$Method == 'Blend',]
+pre.post.orthogonal = pre.post.table[pre.post.table$Method == 'Orthogonal',]
+guess.methods.pre.post.results.greens <- data.frame(
+					     Pre.greens = 0:4,
+					     Standard.ratio = numeric(5),
+					     Standard.greens.added = numeric(5),
+					     Blend.ratio = numeric(5),
+					     Blend.greens.added = numeric(5),
+					     Orthogonal.ratio = numeric(5),
+					     Orthogonal.greens.added = numeric(5)
+)
+for(i in 1:5){
+	guess.methods.pre.post.results.greens$Standard.ratio[i] <- mean(pre.post.standard[pre.post.standard$Pre.number.greens == (i - 1),6] / pre.post.standard[pre.post.standard$Pre.number.greens == (i - 1),2])
+	guess.methods.pre.post.results.greens$Blend.ratio[i] <- mean(pre.post.blend[pre.post.blend$Pre.number.greens == (i - 1),6] / pre.post.blend[pre.post.blend$Pre.number.greens == (i - 1),2])
+	guess.methods.pre.post.results.greens$Orthogonal.ratio[i] <- mean(pre.post.orthogonal[pre.post.orthogonal$Pre.number.greens == (i - 1),6] / pre.post.orthogonal[pre.post.orthogonal$Pre.number.greens == (i - 1),2])
+	guess.methods.pre.post.results.greens$Standard.greens.added[i] <- mean(pre.post.standard[pre.post.standard$Pre.number.greens == (i - 1),10] - pre.post.standard[pre.post.standard$Pre.number.greens == (i - 1),4])
+	guess.methods.pre.post.results.greens$Blend.greens.added[i] <- mean(pre.post.blend[pre.post.blend$Pre.number.greens == (i - 1),10] - pre.post.blend[pre.post.blend$Pre.number.greens == (i - 1),4])
+	guess.methods.pre.post.results.greens$Orthogonal.greens.added[i] <- mean(pre.post.orthogonal[pre.post.orthogonal$Pre.number.greens == (i - 1),10] - pre.post.orthogonal[pre.post.orthogonal$Pre.number.greens == (i - 1),4])
+}
+
+# Yellows
+pre.post.table <- read.csv('~/docs/woRdle/pre-post-simulation-yellows.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
+
+pre.post.table <- pre.post.table[pre.post.table$Pre.number.yellows != 5,]
+pre.post.standard = pre.post.table[pre.post.table$Method == 'Standard',]
+pre.post.blend = pre.post.table[pre.post.table$Method == 'Blend',]
+pre.post.orthogonal = pre.post.table[pre.post.table$Method == 'Orthogonal',]
+guess.methods.pre.post.results.yellows <- data.frame(
+					     Pre.yellows = 0:4,
+					     Standard.ratio = numeric(5),
+					     Standard.yellows.added = numeric(5),
+					     Blend.ratio = numeric(5),
+					     Blend.yellows.added = numeric(5),
+					     Orthogonal.ratio = numeric(5),
+					     Orthogonal.yellows.added = numeric(5)
+)
+for(i in 1:5){
+	guess.methods.pre.post.results.yellows$Standard.ratio[i] <- mean(pre.post.standard[pre.post.standard$Pre.number.yellows == (i - 1),6] / pre.post.standard[pre.post.standard$Pre.number.yellows == (i - 1),2])
+	guess.methods.pre.post.results.yellows$Blend.ratio[i] <- mean(pre.post.blend[pre.post.blend$Pre.number.yellows == (i - 1),6] / pre.post.blend[pre.post.blend$Pre.number.yellows == (i - 1),2])
+	guess.methods.pre.post.results.yellows$Orthogonal.ratio[i] <- mean(pre.post.orthogonal[pre.post.orthogonal$Pre.number.yellows == (i - 1),6] / pre.post.orthogonal[pre.post.orthogonal$Pre.number.yellows == (i - 1),2])
+	guess.methods.pre.post.results.yellows$Standard.yellows.added[i] <- mean(pre.post.standard[pre.post.standard$Pre.number.yellows == (i - 1),10] - pre.post.standard[pre.post.standard$Pre.number.yellows == (i - 1),4])
+	guess.methods.pre.post.results.yellows$Blend.yellows.added[i] <- mean(pre.post.blend[pre.post.blend$Pre.number.yellows == (i - 1),10] - pre.post.blend[pre.post.blend$Pre.number.yellows == (i - 1),4])
+	guess.methods.pre.post.results.yellows$Orthogonal.yellows.added[i] <- mean(pre.post.orthogonal[pre.post.orthogonal$Pre.number.yellows == (i - 1),10] - pre.post.orthogonal[pre.post.orthogonal$Pre.number.yellows == (i - 1),4])
+}
+```

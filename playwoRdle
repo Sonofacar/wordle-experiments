@@ -1,0 +1,191 @@
+#!/usr/bin/Rscript
+
+# The purpose of this script is to automatically play wordle for you.
+# Some of the functionality of this script includes:
+#	* Stating the number of games to be played (-n option)
+#	* Stating the amount of time for the script to be ran (-t option)
+#	* Choosing which guess-method to be used (-m option)
+#	* Running the program quietly (-q option)
+#	* Randomize the guess-method (-r option)
+
+# For defining a new guess method, a function will have to be created.
+# It must be called guessr, have two arguments (number of greens and yellows, 
+# or have them set to nothing), and it must return the name of the guess 
+# method to be called for each iteration. The definition of these functions
+# should be included in ~/docs/woRdle/methods-filter-functions.R
+
+# Current guess methods:
+# standard
+# blend
+# orthogonal
+# ratio-based
+# max-yellows-added
+
+# sourcing our most common functions
+search.functions.path <- '~/bin/playwoRdle-assets/search-functions.R'
+method.functions.path <- '~/bin/playwoRdle-assets/methods-filter-functions.R'
+pipe.path             <- '/tmp/woRdle-pipe'
+round.iteration.path  <- '~/bin/playwoRdle-assets/round-iteration.R'
+time.pipe.path        <- '/tmp/woRdle-timer-pipe'
+methods.vector        <- c('standard','blend','orthogonal','ratio-based','max-yellows-added','random')
+sub.methods.vector    <- c('standard','blend','orthogonal')
+source(search.functions.path)
+
+# Getting the command line arguments
+args <- commandArgs(trailingOnly=T)
+options <- grep('-',args)
+for(i in options){
+	option.tmp <- args[i]
+	if(option.tmp == '-n'){
+		number <- args[i + 1] |> as.numeric()
+	}
+	if(option.tmp == '-t'){
+		time.minutes <- args[i + 1] |> as.numeric()
+	}
+	if(exists('number') & exists('time.minutes')){
+		message('Only one of the -n and -t options may be used')
+		q()
+	}
+	if(option.tmp == '-m'){
+		method <- args[i + 1]
+	}
+	if(option.tmp == '-q'){
+		quiet <- TRUE
+	}
+	if(option.tmp == '-r'){
+		randomize <- TRUE
+	}
+	if(option.tmp == '-h'){
+		message(
+'Options: 
+	-n number : number of iterations to run (default 100).
+	-t minutes: number of minutes to run program (no default).
+	-m method : specify the method of guessing (no default).
+	-q        : run in quiet mode.
+	-h        : display this options message.
+	-r        : randomize the guess method (default if method is not specified).
+
+	Although method and randomize are mutually exclusive, it will continue to 
+	randomize despite the method being specified.
+
+Available methods:
+	standard:
+		performs only the standard sub method.
+	blend:
+		performs only the blend sub method.
+	orthogonal:
+		performs only the orthogonal sub method.
+	ratio-based:
+		based on a simulation of the game to choose which of the
+		sub methods reduced the current pool of possible words based on the
+		amount of current green and yellow letters.
+	max-yellows-added:
+		based on a simulation of the game to choose which of the
+		sub methods produced the most yellow letters based on the amount of
+		current green and yellow letters.
+	random:
+		chooses a random sub method for each guess.')
+		q()
+	}
+}
+
+# Default values
+if(!exists('number') & !exists('time.minutes')){
+	number <- 100
+}
+if(!exists('method')){
+	randomize <- TRUE
+}
+if(!exists('quiet')){
+	quiet <- FALSE
+}
+if(!exists('randomize')){
+	randomize <- FALSE
+}
+
+# Method function definitions
+if(randomize){
+	method <- sample(methods.vector,1)
+	if(!quiet){
+		message(method)
+	}
+}
+source(method.functions.path)
+
+
+if(file.exists(pipe.path)){
+	file.remove(pipe.path) |> invisible()
+}
+system(paste('mkfifo',pipe.path))
+pipe_out        <- fifo(pipe.path,'r')
+guess.table.tmp <- data.frame(
+			      Method = character(1),
+			      Sub.method = character(1),
+			      Guess.number = numeric(1),
+			      Guess = character(1),
+			      Ratio = numeric(1),
+			      Greens = numeric(1),
+			      Yellows = numeric(1),
+			      Post.score = numeric(1)
+)
+game.table.tmp  <- data.frame(
+			     Method = character(1),
+			     Word = character(1),
+			     Number.guesses = numeric(1),
+			     Win = logical(1)
+)
+
+# Number specified loop
+if(exists('number')){
+	for(j in 1:number){
+		pipe_in        <- pipe(paste('woRdle &>',pipe.path),'w')
+		guess          <- 'arose'
+		possible.words <- all.words
+		writeLines(guess, pipe_in)
+		flush(pipe_in)
+		for(i in 1:6){
+			source(round.iteration.path)
+		}
+		close(pipe_in)
+		if(randomize){
+			method <- methods.vector |> sample(1)
+			if(!quiet & j != number){message(method)}
+		}
+		source(method.functions.path)
+	}
+}
+
+# Time specified loop
+time.up <- 0
+if(file.exists(time.pipe.path)){
+	file.remove(time.pipe.path) |> invisible()
+}
+system(paste('mkfifo',time.pipe.path))
+time_pipe_out <- fifo(time.pipe.path,'r')
+time_pipe_in <- pipe(paste('Rscript ~/bin/playwoRdle-assets/timer.R',time.minutes,'&>',time.pipe.path),'w')
+if(exists('time')){
+	while(time.up == 0){
+		pipe_in        <- pipe(paste('woRdle &>',pipe.path),'w')
+		guess          <- 'arose'
+		possible.words <- all.words
+		writeLines(guess, pipe_in)
+		flush(pipe_in)
+		for(i in 1:6){
+			source(round.iteration.path)
+		}
+		close(pipe_in)
+		timer        <- readLines(time_pipe_out)
+		timer.length <- length(timer)
+		if(timer.length != 0){
+			if(timer[timer.length] == '0'){
+				time.up <- 1
+			}
+		}
+		if(randomize){
+			method <- methods.vector |> sample(1)
+			if(!quiet & time.up == 0){message(method)}
+		}
+		source(method.functions.path)
+	}
+}
+file.remove(pipe.path) |> invisible()

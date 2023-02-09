@@ -1,0 +1,44 @@
+#!/usr/bin/Rscript
+
+library(magrittr)
+source('~/bin/playwoRdle-assets/search-functions.R')
+
+# Get commandline arguments
+args <- commandArgs(trailingOnly = T)
+
+# Randomly select a word
+dict      <- read.table("/usr/share/dict/words")
+all.words <- dict[nchar(dict$"V1") == 5,] %>% 
+	grep("^[a-z]",.,ignore.case = F,perl = T,value = T) %>%
+	grep("\'",.,perl = T,value = T,invert = T) %>%
+	tolower(.)
+the.word         <- sample(all.words,1)
+the.word.letters <- NULL
+for(j in 1:5){the.word.letters[j] <- substr(the.word,j,j)}
+
+# If there is an argument, use it as the word instead
+# Also, check if it is 5 letters long
+if(length(args) > 1){
+	message("ERROR:Can only use 1 argument")
+	quit(save = "no")
+}
+if(!(length(args) < 1)){
+	the.word <- args[1]
+}
+
+# Loop through user input and comparisons to the word
+input <- file('stdin','r')
+for(i in 1:6){
+	guess  <- readLines(input,n=1)
+	green  <- is.green(the.word,guess)
+	yellow <- is.yellow(the.word,guess)
+	message(as.numeric(green))
+	message(as.numeric(yellow))
+	if(sum(green) == 5){
+		message("You are correct!!!")
+		message("You got it in ",i," guesses")
+		quit(save = "no")
+	}
+}
+message("Here is the word: ")
+message(the.word)
