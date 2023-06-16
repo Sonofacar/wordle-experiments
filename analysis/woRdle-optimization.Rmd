@@ -7,7 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-source('~/docs/woRdle/search-functions.R')
+source('~/projects/woRdle/search-functions.R')
 library(knitr)
 library(ggplot2)
 library(tidyverse)
@@ -29,7 +29,7 @@ The information will still be mostly applicable, but the best results would be t
 One way of approaching this first part is to choose a word that has the most common letters in it.
 To start off, here is a list of the frequency of each letter in this dictionary.
 ```{r Letter-freq}
-letter.freq <- read.table("~/docs/woRdle/dict-letter-freq",sep = " ")
+letter.freq <- read.table("~/projects/woRdle/analysis/dict-letter-freq",sep = " ")
 colnames(letter.freq) <- c("Frequency","Letter")
 kable(letter.freq[17:26,])
 ```
@@ -41,9 +41,9 @@ Another characteristic of the words in these guesses is that none of them will c
 
 Having set up the word tier groups, I simulated the first guess of a wordle game and pulled out the results of how many greens and how many yellows there were for a random word in each tier.
 
-Doing this test with `r reps` repetitions of each tier gives us the following result:
+Doing this test with 10000 repetitions of each tier gives us the following result:
 ```{r guess-results, echo=F}
-guess.data <- read.csv('~/docs/woRdle/guess-table.csv',header = F)
+guess.data <- read.csv('~/projects/woRdle/analysis/guess-table.csv',header = F)
 first.guess.results <- data.frame("Tier" = numeric(10), "Yellow Mean" = numeric(10), "Green Mean" = numeric(10), "Score" = numeric(10))
 for(i in 1:10){
   yelm <- guess.data[guess.data$Tier == i,2] |> mean()
@@ -69,9 +69,9 @@ My aim is to see when these different methods of guessing are the most useful an
 Here are the results of a simmulation of these methods for guessing:
 
 ```{r guess-methods-overall}
-standard.table <- read.csv('~/docs/woRdle/standard-guess-method.csv')
-blend.table <- read.csv('~/docs/woRdle/blend-guess-method.csv')
-orthogonal.table <- read.csv('~/docs/woRdle/orthogonal-guess-method.csv')
+standard.table <- read.csv('~/projects/woRdle/analysis/standard-guess-method.csv')
+blend.table <- read.csv('~/projects/woRdle/analysis/blend-guess-method.csv')
+orthogonal.table <- read.csv('~/projects/woRdle/analysis/orthogonal-guess-method.csv')
 
 # Methods table 1 (overall comparison)
 methods.results.table1 <- data.frame(
@@ -154,7 +154,7 @@ ggplot()+
 
 ```{r guess-methods-greens-yellows}
 # Greens
-pre.post.table <- read.csv('~/docs/woRdle/pre-post-simulation-greens.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
+pre.post.table <- read.csv('~/projects/woRdle/analysis/pre-post-simulation-greens.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
 
 pre.post.table <- pre.post.table[pre.post.table$Pre.number.greens != 5,]
 pre.post.standard = pre.post.table[pre.post.table$Method == 'Standard',]
@@ -179,7 +179,7 @@ for(i in 1:5){
 }
 
 # Yellows
-pre.post.table <- read.csv('~/docs/woRdle/pre-post-simulation-yellows.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
+pre.post.table <- read.csv('~/projects/woRdle/analysis/pre-post-simulation-yellows.csv',colClasses = c('character','numeric','character','numeric','numeric','numeric','character','numeric','numeric','numeric'))
 
 pre.post.table <- pre.post.table[pre.post.table$Pre.number.yellows != 5,]
 pre.post.standard = pre.post.table[pre.post.table$Method == 'Standard',]

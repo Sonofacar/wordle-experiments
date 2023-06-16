@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #define SAME_LETTER(letter_one, letter_two)	(letter_one == letter_two)
 #define IS_CORRECT				(guess == word)
@@ -39,7 +38,7 @@ char * get_word(int line_number)
 	size_t length = 0;
 	ssize_t word_length;
 
-	fp = fopen("/fsj/carson/c-learning/projects/wordle/words", "r");
+	fp = fopen("/home/carson/projects/woRdle/words", "r");
 	if (fp == NULL) {
 		printf("Failure to open dictionary. Exiting...\n");
 		exit(EXIT_FAILURE);
@@ -104,27 +103,41 @@ int yellow_response(char * word, char * guess, int indices[5])
 
 int yellows_fix(char * word, char * guess, int indices[5], int greens, int yellows)
 {
+	int difference = 0;
+
 	for (int i = 0; i <= 4; i++) {
 		if (indices[i] == -1)
 			continue;
 
 		for (int j = i - 1; j >= 0; --j) {
-			if (indices[j] == indices[i])
+			if (indices[j] == indices[i]) {
 				indices[i] = -1;
+				difference += index_to_int(i);
+				break;
+			}
+			
 		}
 
-		if (index_to_int(indices[i]) & greens)
+		if (index_to_int(indices[i]) & greens) {
 			indices[i] = -1;
+			difference += index_to_int(i);
+		}
 
+		/*
 		if ((indices[i] == -1) && ((yellows & index_to_int(i)) != 0))
 			yellows -= index_to_int(i);
+		*/
 	}
+
+	yellows -= difference;
 
 	printf("{ %d, ", indices[0]);
 	printf("%d, ", indices[1]);
 	printf("%d, ", indices[2]);
 	printf("%d, ", indices[3]);
 	printf("%d }\n", indices[4]);
+
+	return yellows;
 }
 
 int main (int argc, char * argv[])
@@ -147,7 +160,7 @@ int main (int argc, char * argv[])
 	
 	greens = green_response(word, guess);
 	yellows = yellow_response(word, guess, yellow_indices);
-	yellows_fix(word, guess, yellow_indices, greens, yellows);
+	yellows = yellows_fix(word, guess, yellow_indices, greens, yellows);
 
 	printf("%s", word);
 	printf("%s\n", guess);
