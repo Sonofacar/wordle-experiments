@@ -2,10 +2,25 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define SAME_LETTER(letter_one, letter_two) (letter_one == letter_two)
-#define IS_CORRECT (guess == word)
+#define SAME_LETTER(letter_one, letter_two)	(letter_one == letter_two)
+#define IS_CORRECT				(guess == word)
+#define BINARY_PATTERN				("%c%c%c%c%c\n")
+#define BINARY_EXTRACTION(num) \
+	((num) & 0x10 ? '1' : '0'), \
+	((num) & 0x08 ? '1' : '0'), \
+	((num) & 0x04 ? '1' : '0'), \
+	((num) & 0x02 ? '1' : '0'), \
+	((num) & 0x01 ? '1' : '0') 
 
-int random_line(int max) {
+int index_to_int (int index)
+{
+	int reference[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+
+	return reference[index];
+}
+
+int random_line(int max)
+{
 	FILE * fp;
 	unsigned int result;
 
@@ -17,13 +32,14 @@ int random_line(int max) {
 	return result;
 }
 
-char * get_word(int line_number) {
+char * get_word(int line_number)
+{
 	FILE * fp;
 	char * result = NULL;
 	size_t length = 0;
 	ssize_t word_length;
 
-	fp = fopen("/home/carson/projects/learn-c/projects/wordle/words", "r");
+	fp = fopen("/fsj/carson/c-learning/projects/wordle/words", "r");
 	if (fp == NULL) {
 		printf("Failure to open dictionary. Exiting...\n");
 		exit(EXIT_FAILURE);
@@ -38,42 +54,77 @@ char * get_word(int line_number) {
 	return result;
 }
 
-int green_response(char * word, char * guess) {
+int green_response(char * word, char * guess)
+{
 	int response = 0;
 
-	for (int i = 0; i <= 5; ++i) {
+	for (int i = 0; i <= 4; i++) {
 		if (SAME_LETTER(word[i], guess[i]))
 			response += 1;
+		if (i == 4){
+			return response;
+		}
 		response = response << 1;
 	}
-	
-	return response;
 }
 
-int yellow_cycle(char * word, char letter, int number) {
+int yellow_cycle(char * word, char letter, int number, int indices[5])
+{
 	if (SAME_LETTER(letter, word[number])) {
+		indices[number] = -1;
 		return 0;
 	}
 
-	for (int i = 0; i <= 5; ++i) {
+	for (int i = 0; i <= 4; i++) {
 		if (i == number) 
 			continue;
-		if (word[i] == letter)
+		if (word[i] == letter) {
+			indices[number] = i;
 			return 1;
+		}
 	}
 	
 	return 0;
 }
 
-int yellow_response(char * word, char * guess) {
+int yellow_response(char * word, char * guess, int indices[5])
+{
 	int response = 0;
 
-	for (int i = 0; i <= 5; ++i) {
-		yellow_cycle(word, guess[i], i);
+	for (int i = 0; i <= 4; i++) {
+		response += yellow_cycle(word, guess[i], i, indices);
+
+		if (i == 4) {
+			return response;
+		}
+
 		response = response << 1;
 	}
+}
 
-	return response;
+int yellows_fix(char * word, char * guess, int indices[5], int greens, int yellows)
+{
+	for (int i = 0; i <= 4; i++) {
+		if (indices[i] == -1)
+			continue;
+
+		for (int j = i - 1; j >= 0; --j) {
+			if (indices[j] == indices[i])
+				indices[i] = -1;
+		}
+
+		if (index_to_int(indices[i]) & greens)
+			indices[i] = -1;
+
+		if ((indices[i] == -1) && ((yellows & index_to_int(i)) != 0))
+			yellows -= index_to_int(i);
+	}
+
+	printf("{ %d, ", indices[0]);
+	printf("%d, ", indices[1]);
+	printf("%d, ", indices[2]);
+	printf("%d, ", indices[3]);
+	printf("%d }\n", indices[4]);
 }
 
 int main (int argc, char * argv[])
@@ -82,7 +133,8 @@ int main (int argc, char * argv[])
 	unsigned int r;
 	int greens = 0;
 	int yellows = 0;
-	char * guess = "eeeee";
+	char * guess = "peeks";
+	int yellow_indices[5] = {-1, -1, -1, -1, -1};
 
 	r = random_line(4597);
 
@@ -94,11 +146,13 @@ int main (int argc, char * argv[])
 	}
 	
 	greens = green_response(word, guess);
-	yellows = yellow_response(word, guess);
+	yellows = yellow_response(word, guess, yellow_indices);
+	yellows_fix(word, guess, yellow_indices, greens, yellows);
 
 	printf("%s", word);
-	printf("%x\n", greens);
-	printf("%x\n", yellows);
+	printf("%s\n", guess);
+	printf(BINARY_PATTERN, BINARY_EXTRACTION(greens));
+	printf(BINARY_PATTERN, BINARY_EXTRACTION(yellows));
 
 	if (word) {
 		free(word);
