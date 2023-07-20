@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define DICTIONARY_PATH				("/home/carson/projects/woRdle/words")
+/*#define DICTIONARY_PATH				("/auto/fsj/carson/c-learning/projects/wordle-repo/words")*/
 #define SAME_LETTER(letter_one, letter_two)	(letter_one == letter_two)
 #define IS_CORRECT				(guess == word)
 #define BINARY_PATTERN				("%c%c%c%c%c\n")
@@ -14,6 +16,9 @@
 int index_to_int (int index)
 {
 	int reference[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	
+	if (index == -1)
+		return 0;
 
 	return reference[index];
 }
@@ -38,7 +43,7 @@ char * get_word(int line_number)
 	size_t length = 0;
 	ssize_t word_length;
 
-	fp = fopen("/home/carson/projects/woRdle/words", "r");
+	fp = fopen(DICTIONARY_PATH, "r");
 	if (fp == NULL) {
 		printf("Failure to open dictionary. Exiting...\n");
 		exit(EXIT_FAILURE);
@@ -101,9 +106,26 @@ int yellow_response(char * word, char * guess, int indices[5])
 	}
 }
 
+int forward_check(char * word, char letter, int number, int indices[5], int greens) 
+{
+	int response = 0;
+
+	for (int i = number + 1; i <= 4; i++) {
+		if (index_to_int(number) & greens)
+			break;
+
+		if (letter == word[i]) {
+			response += index_to_int(i);
+			indices[number] = i;
+		}
+	}
+	return response;
+}
+
 int yellows_fix(char * word, char * guess, int indices[5], int greens, int yellows)
 {
 	int difference = 0;
+	int correction = 0;
 
 	for (int i = 0; i <= 4; i++) {
 		if (indices[i] == -1)
@@ -120,7 +142,7 @@ int yellows_fix(char * word, char * guess, int indices[5], int greens, int yello
 
 		if (index_to_int(indices[i]) & greens) {
 			indices[i] = -1;
-			difference += index_to_int(i);
+			difference += (index_to_int(i) - forward_check(word, guess[i], i, indices, greens));
 		}
 
 		/*
@@ -151,7 +173,8 @@ int main (int argc, char * argv[])
 
 	r = random_line(4597);
 
-	word = get_word(r);
+	/*word = get_word(r);*/
+	word = "kneed\n";
 
 	if (word == NULL) {
 		printf("Failure to get word. Exiting...\n");
