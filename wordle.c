@@ -108,18 +108,19 @@ int yellow_response(char * word, char * guess, int indices[5])
 
 int forward_check(char * word, char letter, int number, int indices[5], int greens) 
 {
-	int response = 0;
-
 	for (int i = number + 1; i <= 4; i++) {
 		if (index_to_int(number) & greens)
 			break;
 
+		if (index_to_int(i) & greens) 
+			continue;
+
 		if (letter == word[i]) {
-			response += index_to_int(i);
 			indices[number] = i;
+			return index_to_int(number);
 		}
 	}
-	return response;
+	return 0;
 }
 
 int yellows_fix(char * word, char * guess, int indices[5], int greens, int yellows)
@@ -144,22 +145,17 @@ int yellows_fix(char * word, char * guess, int indices[5], int greens, int yello
 			indices[i] = -1;
 			difference += (index_to_int(i) - forward_check(word, guess[i], i, indices, greens));
 		}
-
-		/*
-		if ((indices[i] == -1) && ((yellows & index_to_int(i)) != 0))
-			yellows -= index_to_int(i);
-		*/
 	}
 
 	yellows -= difference;
 
-	printf("{ %d, ", indices[0]);
-	printf("%d, ", indices[1]);
-	printf("%d, ", indices[2]);
-	printf("%d, ", indices[3]);
-	printf("%d }\n", indices[4]);
-
 	return yellows;
+}
+
+char * get_guess(char * guess)
+{
+	scanf("%5s", guess);
+	return guess;
 }
 
 int main (int argc, char * argv[])
@@ -168,30 +164,36 @@ int main (int argc, char * argv[])
 	unsigned int r;
 	int greens = 0;
 	int yellows = 0;
-	char * guess = "peeks";
+	char * guess;
 	int yellow_indices[5] = {-1, -1, -1, -1, -1};
 
 	r = random_line(4597);
 
-	/*word = get_word(r);*/
-	word = "kneed\n";
+	word = get_word(r);
+	/*word = "stems\n";*/
 
 	if (word == NULL) {
 		printf("Failure to get word. Exiting...\n");
 		exit(EXIT_FAILURE);
 	}
+
+	guess = get_guess(guess);
 	
-	greens = green_response(word, guess);
-	yellows = yellow_response(word, guess, yellow_indices);
-	yellows = yellows_fix(word, guess, yellow_indices, greens, yellows);
+	for (int i = 0; i <= 5; i++) {
+		guess = get_guess(guess);
+		greens = green_response(word, guess);
+		if (greens == 31) {
+			printf("Correct!\n");
+			exit(EXIT_SUCCESS);
+		}
+		yellows = yellow_response(word, guess, yellow_indices);
+		yellows = yellows_fix(word, guess, yellow_indices, greens, yellows);
 
-	printf("%s", word);
-	printf("%s\n", guess);
-	printf(BINARY_PATTERN, BINARY_EXTRACTION(greens));
-	printf(BINARY_PATTERN, BINARY_EXTRACTION(yellows));
-
-	if (word) {
-		free(word);
+		printf(BINARY_PATTERN, BINARY_EXTRACTION(greens));
+		printf(BINARY_PATTERN, BINARY_EXTRACTION(yellows));
 	}
+
+	printf("You lost :(\n");
+
 	exit(EXIT_SUCCESS);
 }
